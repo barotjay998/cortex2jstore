@@ -131,7 +131,7 @@ dmypy.json
 # VS Code files for those working on multiple tools
 *.code-workspace
 
-# Ignore the data folder
+# Ignore the contents of the data folder
 data/
 
 # Ignore output folder

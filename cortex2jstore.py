@@ -33,9 +33,15 @@ class Cortex2JStore:
             self.cortex = []
             self.jstore = []
 
+            # Map string values to variable names (our internal datastructure in this case) using a dictionary
+            self.var_dict = {
+                'cortex': self.cortex,
+                'jstore': self.jstore,
+            }
+
             # Convert the raw files to internal data structures
-            self.raw2data(path = args.cortex_raw, type = "csv", savein = "cortex", op_ref_required = True)
-            self.raw2data(path = args.jstore_raw, type = "xls", savein = "jstore", op_ref_required = True)
+            self.raw2data(path = args.cortex_raw, type = "csv", savein = "cortex", is_required_reference = True)
+            self.raw2data(path = args.jstore_raw, type = "xls", savein = "jstore", is_required_reference = True)
 
 
         except Exception as e:
@@ -58,45 +64,51 @@ class Cortex2JStore:
             self.logger.error("Cortex2JStore::driver: Exception: " + str(e))
             raise e
     
+    
+    """
+    This method converts the raw data into internal data structures
 
-    def raw2data (self, path, type, savein, op_ref_required = False):
+    Parameters:
+    :param path: Path to the raw file
+    :ptype path: str
+    :param type: Type of the raw file
+    :ptype type: str
+    :param savein: Name of the datastructure to save the data in (cortex or jstore)
+    :ptype savein: str
+    :param is_required_reference: Flag to indicate if the data is required for the reference output
+    :ptype is_required_reference: bool
+    """
+    def raw2data (self, path, type, savein, is_required_reference= False):
         try:
             self.logger.info("Cortex2JStore::raw2data")
-
-            # Map string values to variable names using a dictionary
-            var_dict = {
-                'cortex': self.cortex,
-                'jstore': self.jstore,
-            }
-
+            
+            # Read the CSV file
             if type == "csv":
-                # Read the CSV file
                 with open(path, 'r') as csv_file:
                     csv_reader = csv.DictReader(csv_file)
-                    for row in csv_reader:
-                        var_dict.get(savein).append(row)
 
+                    for row in csv_reader:
+                        self.var_dict.get(savein).append(row)
+
+            # Read the XLS file
             elif type == "xls":
-                # Read the XLS file
                 workbook = xlrd.open_workbook(path)
                 worksheet = workbook.sheet_by_index(0)
                 headers = [cell.value for cell in worksheet.row(0)]
+
                 for i in range(1, worksheet.nrows):
                     row_data = {}
                     for j in range(len(headers)):
                         row_data[headers[j]] = worksheet.cell_value(i, j)
-                    
-                    var_dict.get(savein).append(row)
+                    self.var_dict.get(savein).append(row_data)
             
             else:
                 raise Exception("Unknown file type")
 
-
-            if op_ref_required:
-                # Export the data to a JSON file
+            # Export the data to a JSON file
+            if is_required_reference:
                 with open('output/'+ savein +'.json', 'w') as json_file:
-                    json.dump(var_dict.get(savein), json_file, indent=4)
-        
+                    json.dump (self.var_dict.get(savein), json_file, indent=4)     
 
         except Exception as e:
             self.logger.error("Cortex2JStore::raw2data: Exception: " + str(e))
@@ -127,9 +139,9 @@ def parseCmdLineArgs ():
 
   parser.add_argument ("-l", "--loglevel", type=int, default=logging.INFO, choices=[logging.DEBUG,logging.INFO,logging.WARNING,logging.ERROR,logging.CRITICAL], help="logging level, choices 10,20,30,40,50: default 20=logging.INFO")
 
-  parser.add_argument ("-c", "--cortex_raw", type=str, default="data/cortex.csv", help="cortex csv raw file: default cortex.csv")
+  parser.add_argument ("-c", "--cortex_raw", type=str, default="data/cortex.csv", help="cortex csv raw file: default data/cortex.csv")
 
-  parser.add_argument ("-j", "--jstore_raw", type=str, default="data/jstore.xls", help="jstore xls raw file: default jstore.xls")
+  parser.add_argument ("-j", "--jstore_raw", type=str, default="data/jstore.xls", help="jstore xls raw file: default data/jstore.xls")
   
   return parser.parse_args()
 
