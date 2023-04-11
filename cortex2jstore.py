@@ -10,6 +10,7 @@ import argparse
 import csv
 import xlrd
 import json
+import time
 
 class Cortex2JStore:
         
@@ -20,7 +21,6 @@ class Cortex2JStore:
         self.logger = logger # Logger object
         self.cortex = None # Cortex data
         self.jstore = None # JStore data
-
     
     """
     Configure
@@ -40,8 +40,8 @@ class Cortex2JStore:
             }
 
             # Convert the raw files to internal data structures
-            self.raw2data(path = args.cortex_raw, type = "csv", savein = "cortex", is_required_reference = True)
-            self.raw2data(path = args.jstore_raw, type = "xls", savein = "jstore", is_required_reference = True)
+            self.raw2data(path = args.cortex_raw, type = "csv", target = "cortex", is_2bexported = False)
+            self.raw2data(path = args.jstore_raw, type = "xls", target = "jstore", is_2bexported = True)
 
 
         except Exception as e:
@@ -57,14 +57,47 @@ class Cortex2JStore:
             self.logger.info("Cortex2JStore::driver")
 
             # dump the configuration
-            self.dump ()
+            self.dump ()  
+                        
+            # Clean up and export the Cortex data
+            self.cortex_cleanup()
+            self.export_data(data = self.cortex, path = 'output/cortex.json')
+            
+            # Find the matches
+            matches = self.find_matches()
+            self.export_data(data = matches, path = 'output/matches.json')
 
-        
         except Exception as e:
             self.logger.error("Cortex2JStore::driver: Exception: " + str(e))
             raise e
     
+
+    def find_matches(self):
+        try:
+            self.logger.info("Cortex2JStore::find_matches: Finding matches between Cortex and JStore")
+
+            start_time = time.time()
+
+            # Create a dictionary of "Original File Name" values from cortex
+            cortex_dict = {c["Original File Name"]: c for c in self.cortex}
+
+            # Iterate over jstore and check for matches with cortex_dict
+            matches = []
+            for j in self.jstore:
+                c = cortex_dict.get(j["Filename"])
+                if c:
+                    matches.append((j, c))
+            
+            end_time = time.time()
+            self.logger.info("Matches alogrithm took : " + str(end_time - start_time) + " seconds")
+
+            return matches
+        
+        except Exception as e:
+            self.logger.error("Cortex2JStore::find_matches: Exception: " + str(e))
+            raise e
     
+
     """
     This method converts the raw data into internal data structures
 
@@ -73,12 +106,12 @@ class Cortex2JStore:
     :ptype path: str
     :param type: Type of the raw file
     :ptype type: str
-    :param savein: Name of the datastructure to save the data in (cortex or jstore)
-    :ptype savein: str
+    :param target: Name of the datastructure to save the data in (cortex or jstore)
+    :ptype target: str
     :param is_required_reference: Flag to indicate if the data is required for the reference output
     :ptype is_required_reference: bool
     """
-    def raw2data (self, path, type, savein, is_required_reference= False):
+    def raw2data (self, path, type, target, is_2bexported= False):
         try:
             self.logger.info("Cortex2JStore::raw2data")
             
@@ -88,7 +121,7 @@ class Cortex2JStore:
                     csv_reader = csv.DictReader(csv_file)
 
                     for row in csv_reader:
-                        self.var_dict.get(savein).append(row)
+                        self.var_dict.get(target).append(row)
 
             # Read the XLS file
             elif type == "xls":
@@ -100,18 +133,55 @@ class Cortex2JStore:
                     row_data = {}
                     for j in range(len(headers)):
                         row_data[headers[j]] = worksheet.cell_value(i, j)
-                    self.var_dict.get(savein).append(row_data)
+                    self.var_dict.get(target).append(row_data)
             
             else:
                 raise Exception("Unknown file type")
 
-            # Export the data to a JSON file
-            if is_required_reference:
-                with open('output/'+ savein +'.json', 'w') as json_file:
-                    json.dump (self.var_dict.get(savein), json_file, indent=4)     
+            # Export the data
+            if is_2bexported: self.export_data(data = self.var_dict.get(target), path = 'output/'+ target +'.json') 
 
         except Exception as e:
             self.logger.error("Cortex2JStore::raw2data: Exception: " + str(e))
+            raise e
+    
+
+    def cortex_cleanup(self):
+        try:
+            self.logger.info("Cortex2JStore::cortex_cleanup")
+            
+            for item in self.cortex:
+                new_keys = {}
+
+                for key in item.keys():
+                    new_key = key.replace("\u00ef\u00bb\u00bf", "").replace("\"", "")
+                    new_keys[new_key] = item[key]
+
+                item.clear()
+                item.update(new_keys)
+        
+        except Exception as e:
+            self.logger.error("Cortex2JStore::cortex_cleanup: Exception: " + str(e))
+            raise e
+
+    """
+    Description: exports the data to JSON files
+
+    Parameters:
+    :param data: Data to be exported
+    :ptype data: dict
+    :param path: Path to the JSON file
+    :ptype path: str
+    """
+    def export_data (self, data, path):
+        try:
+            self.logger.info("Cortex2JStore::export_data")
+
+            with open(path, 'w') as json_file:
+                json.dump (data, json_file, indent=4)     
+
+        except Exception as e:
+            self.logger.error("Cortex2JStore::export_data: Exception: " + str(e))
             raise e
     
 
