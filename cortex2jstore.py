@@ -5,6 +5,7 @@ Date: 04/07/2023
 """
 
 # import the required modules
+from config import match_columns
 import logging
 import argparse
 import csv
@@ -21,6 +22,7 @@ class Cortex2JStore:
         self.logger = logger # Logger object
         self.cortex = None # Cortex data
         self.jstore = None # JStore data
+        self.matches = None # Matches between Cortex and JStore
     
     """
     Configure
@@ -32,11 +34,13 @@ class Cortex2JStore:
             # Initialize the data structures
             self.cortex = []
             self.jstore = []
+            self.matches = []
 
             # Map string values to variable names (our internal datastructure in this case) using a dictionary
             self.var_dict = {
                 'cortex': self.cortex,
                 'jstore': self.jstore,
+                'matches': self.matches
             }
 
             # Convert the raw files to internal data structures
@@ -64,8 +68,12 @@ class Cortex2JStore:
             self.export_data(data = self.cortex, path = 'output/cortex.json')
             
             # Find the matches
-            matches = self.find_matches()
-            self.export_data(data = matches, path = 'output/matches.json')
+            self.find_matches()
+            self.export_data(data = self.matches, path = 'output/matches.json')
+
+            # Combine the matches
+            self.combine_matches()
+            self.export_data(data = self.matches, path = 'output/combined.json')
 
         except Exception as e:
             self.logger.error("Cortex2JStore::driver: Exception: " + str(e))
@@ -82,21 +90,40 @@ class Cortex2JStore:
             cortex_dict = {c["Original File Name"]: c for c in self.cortex}
 
             # Iterate over jstore and check for matches with cortex_dict
-            matches = []
             for j in self.jstore:
                 c = cortex_dict.get(j["Filename"])
                 if c:
-                    matches.append((j, c))
+                    self.matches.append((j, c))
             
             end_time = time.time()
-            self.logger.info("Matches alogrithm took : " + str(end_time - start_time) + " seconds")
 
-            return matches
+            self.logger.info("Matches alogrithm took : " + str(end_time - start_time) + " seconds")
         
         except Exception as e:
             self.logger.error("Cortex2JStore::find_matches: Exception: " + str(e))
             raise e
     
+
+    def combine_matches (self):
+        try:
+            self.logger.info("Cortex2Jstore::combine_matches: Combining matches")
+
+            # Iterator over the matching records
+            for match in self.matches:
+                
+                # Iterate over the match_columns dictionary
+                # and update the jstore with cortex column data.
+                for k, v in match_columns.items():
+                    
+                    # Check if the value is empty in the jstore data, 
+                    # as we do not want to overwrite the existing data.
+                    # with cortex data
+                    if match[0][k] == "":
+                        match[0][k] = match[1][v]
+        
+        except Exception as e:
+            self.logger.error("Cortex2Jstore::combine_matches: Exception: " + str(e))
+            raise e
 
     """
     This method converts the raw data into internal data structures
