@@ -12,6 +12,8 @@ import csv
 import xlrd
 import json
 import time
+import pandas as pd
+import openpyxl
 
 class Cortex2JStore:
         
@@ -65,15 +67,21 @@ class Cortex2JStore:
                         
             # Clean up and export the Cortex data
             self.cortex_cleanup()
-            self.export_data(data = self.cortex, path = 'output/cortex.json')
+            # self.export_data(data = self.cortex, path = 'output/cortex.json', type = 'json')
             
             # Find the matches
             self.find_matches()
-            self.export_data(data = self.matches, path = 'output/matches.json')
+            # self.export_data(data = self.matches, path = 'output/matches.json', type = 'json')
 
             # Combine the matches
             self.combine_matches()
-            self.export_data(data = self.matches, path = 'output/combined.json')
+            # self.export_data(data = self.matches, path = 'output/combined.json', type = 'json')
+
+            # Remove the cortex data from the combined matches
+            # self.export_data(data = self.remove_cortex_data(), path = 'output/finaljstore.json', type='json')
+
+            # Export the final JStore data in XLSX format
+            self.export_data(data = self.remove_cortex_data(), path = 'output/finaljstore.xlsx', type = 'xlsx')
 
         except Exception as e:
             self.logger.error("Cortex2JStore::driver: Exception: " + str(e))
@@ -123,6 +131,23 @@ class Cortex2JStore:
         
         except Exception as e:
             self.logger.error("Cortex2Jstore::combine_matches: Exception: " + str(e))
+            raise e
+    
+
+    def remove_cortex_data (self):
+        try:
+            self.logger.info("Cortex2Jstore::remove_cortex_data: Removing cortex data from combined matches")
+
+            jstore_final = []
+
+            # Iterate over the combined matches and remove the cortex data
+            for match in self.matches:
+                jstore_final.append(match[0])
+
+            return jstore_final
+                
+        except Exception as e:
+            self.logger.error("Cortex2Jstore::remove_cortex_data: Exception: " + str(e))
             raise e
 
     """
@@ -200,12 +225,24 @@ class Cortex2JStore:
     :param path: Path to the JSON file
     :ptype path: str
     """
-    def export_data (self, data, path):
+    def export_data (self, data, path, type = "json"):
         try:
             self.logger.info("Cortex2JStore::export_data")
 
-            with open(path, 'w') as json_file:
-                json.dump (data, json_file, indent=4)     
+            # Export the data to JSON file
+            if type == "json":
+                with open(path, 'w') as json_file:
+                    json.dump (data, json_file, indent=4)
+            
+            elif type == "xlsx":
+                # convert the list of dictionaries to a DataFrame
+                df = pd.DataFrame(data)
+
+                # convert the dataframe to an XlsxWriter Excel object.
+                df.to_excel(path, index=False)
+                
+            else:
+                raise Exception("Unknown file type")
 
         except Exception as e:
             self.logger.error("Cortex2JStore::export_data: Exception: " + str(e))
