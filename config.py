@@ -16,11 +16,16 @@ match_columns = {
     # represent the physical condtion of the asset.
     "Work Type[2071442]": "Original Asset Condition",
     "Contributor[2071404]": "Asset Donor",
-    "Copyright[2071426]": "Copyright",
-    "Holding Institution[2071428]": "Vu Archive Collection",
+    # "Copyright[2071426]": "Copyright",
+    # "Holding Institution[2071428]": "Vu Archive Collection",
     # Cortex Unique ID
     "Identifier[2071405]": "Unique Identifier",
     "Edition[2071419]": "Date Scanned"
 
     # Add more columns here
+}
+
+jstore_schema_columns = {
+    "Vanderbilt Local Subjects[2083876]",
+    "Vanderbilt People[2083840]",
 }
